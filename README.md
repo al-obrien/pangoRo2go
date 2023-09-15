@@ -14,13 +14,13 @@ includes a Dockerfile to create an image for containerized deployments.
 ## Project organization
 
 The project is organized as a typical RStudio Project. The main script
-to create the web API is the default `plumber.R` in the project’s root
+to create the web API is the default `plumber.R`, in the project’s root
 location. For testing purposes, there is another script called
-`test_api.R` which makes it easier via {httr} and {callr} to check the
+`test_api.R` which makes it easier (via {httr} and {callr}) to check the
 API functionality by launching a background process for the API and
-making requests, such as POST. This is a bit easier than Swagger as one
-can more easily customize request details (e.g. Swagger at time of
-writing would not accept a request body for processing).
+making requests, such as POST. This is easier than Swagger as one can
+more easily customize request details (e.g. Swagger at time of writing
+would not accept a request body for processing).
 
 To manage R package dependencies, {renv} is used. There are a few
 profiles available, the *default* tracks packages for the entire project
@@ -29,10 +29,10 @@ profiles available, the *default* tracks packages for the entire project
 the API to run. This distinction is important if creating containers
 that are as light-weight as possible.
 
-A Dockerfile in the root folder is available for those wishing to create
-the image and deploy the API as a container. The details are customized
-for this project to use {renv}, specifically the minimum packages to run
-the API which are essentially just {plumber} and {pangoRo} and their
+A `Dockerfile` in the root folder is available for those wishing to
+create the Docker image and deploy the API as a container. The details
+are customized for this project to use {renv}, specifically the minimum
+packages to run the API which are {plumber} and {pangoRo} plus their
 direct dependencies.
 
 ## API End-Points
@@ -82,8 +82,8 @@ commands should run almost identically after swapping podman -\> docker
 in the command line.
 
 It is assumed that your system already has **podman** installed (see
-[official docs](https://podman.io/docs/installation)) and you are
-familiar with the basic operations.
+[official docs](https://podman.io/docs/installation)) and are familiar
+with the basic operations.
 
 Various hosting options for containers, and alternatives, are outlined
 further on {plumber} [package
@@ -94,15 +94,15 @@ DigitalOcean, or dockerize.io to host the API.
 ### Build custom Dockerfile image
 
 Although this project provides a Dockerfile, one does not have to use
-it. It may be preferred to operate or extend on the image from
+it. It may be preferred to operate or extend the image from
 *rstudio/plumber*. The Dockerfile provided here is similar to RStudio’s
-official version but has a few customizations, namely working with
-{renv} for all the package management and installs. Furthermore, this
-Dockerfile will create an image that swaps the user to an account that
-is not root. If you plan to extend this project’s Dockerfile, you may
-need to add more packages and their required system dependencies. If you
-are uncertain as to which Linux packages are required, [Posit Public
-Package Manager](https://packagemanager.posit.co/client/#/) provides a
+official version but customized to work with {renv} for all the package
+management and installs. Furthermore, this Dockerfile will create an
+image that swaps the user to an account that is not root. If you plan to
+extend this project’s Dockerfile, you may need to add more packages and
+their required system dependencies. If you are uncertain as to which
+Linux packages are required, [Posit Public Package
+Manager](https://packagemanager.posit.co/client/#/) provides a
 dependency list for all R packages.
 
 To build the Dockerfile first navigate to the associated project folder
