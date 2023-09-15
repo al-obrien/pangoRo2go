@@ -1,0 +1,139 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  eval = FALSE,
+  comment = "#>"
+)
+```
+
+# pangoRo2Go
+
+## Overview
+
+This project provides a Plumber API to run some of the core functionality of the {pangoRo} package, written in the R language. The project alone can be used to directly deploy to Posit (formerly RStudio) Connect using the push-to-deploy button. However, this project also includes a Dockerfile to create an image for containerized deployments.
+
+## Project organization
+
+The project is organized as a typical RStudio Project. The main script to create the web API is the default `plumber.R`, in the project's root location. For testing purposes, there is another script called `test_api.R` which makes it easier (via {httr} and {callr}) to check the API functionality by launching a background process for the API and making requests, such as POST. This is easier than Swagger as one can more easily customize request details (e.g. Swagger at time of writing would not accept a request body for processing).
+
+To manage R package dependencies, {renv} is used. There are a few profiles available, the *default* tracks packages for the entire project (such as {rmarkdown} for this README) whereas *plumber* contains the `renv.lock` file specific to the subset of packages required just for the API to run. This distinction is important if creating containers that are as light-weight as possible.
+
+A `Dockerfile` in the root folder is available for those wishing to create the Docker image and deploy the API as a container. The details are customized for this project to use {renv}, specifically the minimum packages to run the API which are  {plumber} and {pangoRo} plus their direct dependencies. 
+
+## API End-Points
+
+This application has the following end-points that map to various functions within {pangoRo}:
+
+- `/expand`: POST request to expand alias names for a vector of PANGO lineages.
+- `/collapse`: POST request to collapse vector of PANGO lineage names to their alias.
+- `/search`: POST request to provide vectors for `input`, `search`, and `direction` parameters.
+- `/latest`: GET request to return date the API last updated the PANGOlin alias table.
+- `/refresh`: PUT request to force the refresh of the alias table in the active session.
+
+For example, one can use the *expand* end-point as follows:  
+
+```{r}
+library(httr)
+library(jsonlite)
+
+POST(file.path(API_URL, 'expand'),
+    body = toJSON(c('B.1.1.529.1', 'B.1.1.529.2.75.1.2', 'BA.1'))) |>
+  content(simplifyVector = TRUE)
+```
+
+The *search* end-point requires a named list converted to JSON for each of the function inputs to be mapped:  
+
+```{r}
+POST(file.path(API_URL, 'search'),
+     body = toJSON(list(input= c('BA.5', 'BA.5'), 
+                        search = c('BA.5.1', 'BL.1'),
+                        direction = 'both'))) |>
+  content(simplifyVector = TRUE)
+```
+
+## Running as a container
+
+The following sections provide guidance if the preferred method to host the Plumber API is via a container. The examples use **podman**, which is a popular alternative to **docker**. If you prefer **docker** the commands should run almost identically after swapping podman -> docker in the command line. 
+
+It is assumed that your system already has **podman** installed (see [official docs](https://podman.io/docs/installation)) and are familiar with the basic operations. 
+
+Various hosting options for containers, and alternatives, are outlined further on {plumber} [package website](https://www.rplumber.io/articles/hosting.html). Once the image is created, one can select a service provider such as AWS, Azure, DigitalOcean, or dockerize.io to host the API.
+
+### Build custom Dockerfile image
+
+Although this project provides a Dockerfile, one does not have to use it. It may be preferred to operate or extend the image from *rstudio/plumber*. The Dockerfile provided here is similar to RStudio's official version but customized to work with {renv} for all the package management and installs. Furthermore, this Dockerfile will create an image that swaps the user to an account that is not root. If you plan to extend this project's Dockerfile, you may need to add more packages and their required system dependencies. If you are uncertain as to which Linux packages are required, [Posit Public Package Manager](https://packagemanager.posit.co/client/#/) provides a dependency list for all R packages.
+
+To build the Dockerfile first navigate to the associated project folder and then provide the R and {renv} versions that you know the project is using to the `podman` command.
+
+```{bash}
+cd /path/to/folder/with/Dockerfile
+
+podman build \
+  --build-arg=RENV_VERSION=v1.0.0 \
+  --build-arg=R_VERSION=4.3.1 \ 
+  -t pangoro2Go \
+  .
+```
+
+### Run custom Dockerfile image
+
+After the image is created, you can test it with `podman run`. If this works locally you are ready to push this image to a repository of your choice and use it to host on your preferred service provider.
+
+```{bash}
+podman run --rm -d -p 8000:8000 pangoro2go
+```
+
+### Debugging container
+
+If you want to step into the container, find the container running locally and `exec` a shell.
+
+```{bash}
+# Find the active container
+podman ps
+
+# Enter container with shell
+podman exec -it <container-id> sh
+```
+
+### Test response from locally running container 
+
+If the container is running locally, one can test prior to uploading to host location. This can be done directly from R in the example below. This is similar to above examples using the API but specific to when podman is running the container locally on port 8000.
+
+```{r}
+library(httr)
+library(jsonlite)
+
+# Connect to running container, locally
+api_port <- 8000
+pangoroURL <- paste0('http://127.0.0.1:', api_port)
+
+# Send POST request
+POST(file.path(pangoroURL, 'expand'),
+     body = toJSON(c('B.1.1.529.1', 'B.1.1.529.2.75.1.2', 'BA.1', NA_character_))) |>
+  content(simplifyVector = TRUE)
+```
+
+### Extend `rstudio/plumber` Dockerfile
+
+As previously mentioned, you can also use the rstudio/plumber image directly and extend it using a Dockerfile of your own as suggested in their documentation:
+
+```{bash}
+# ./Dockerfile
+   FROM rstudio/plumber:latest
+   RUN apt-get update -qq && apt-get install -y \
+   
+   #[list-your-debian-packages-here]
+     
+   # Add app files from host's present working dir
+   COPY . /api
+   
+   # Set default startup command to run the app's "plumber.R" file
+   CMD ["/api/plumber.R"]
+```
+
